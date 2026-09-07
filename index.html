@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bóc Tách Kèo Bóng Đá</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; margin: 0; padding: 16px; }
+    h2 { text-align: center; margin-bottom: 16px; font-size: 1.2rem; color: #38bdf8; }
+    .card { background: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+    label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: #94a3b8; }
+    input[type="text"] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .upload-box { background: #1e293b; border: 1px dashed #475569; padding: 10px; border-radius: 8px; text-align: center; }
+    .upload-box span { display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 6px; color: #cbd5e1; }
+    input[type="file"] { width: 100%; font-size: 0.75rem; color: #94a3b8; }
+    button { width: 100%; padding: 12px; border-radius: 6px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+    .btn-submit { background: #0284c7; color: white; margin-bottom: 12px; }
+    .btn-submit:disabled { background: #475569; }
+    .btn-copy { background: #10b981; color: white; display: none; }
+    textarea { width: 100%; height: 220px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #38bdf8; padding: 10px; font-family: monospace; font-size: 0.85rem; margin-bottom: 8px; }
+    #status { text-align: center; font-size: 0.85rem; color: #fbbf24; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+  <h2>TOOL BÓC TÁCH KÈO ALL-IN-ONE</h2>
+
+  <div class="card">
+    <label>GEMINI API KEY:</label>
+    <input type="text" id="apiKey" placeholder="Dán Gemini API Key vào đây..." />
+  </div>
+
+  <div class="grid">
+    <div class="upload-box">
+      <span>1. Kèo Chấp (HDP)</span>
+      <input type="file" id="imgHdp" accept="image/*" capture="environment">
+    </div>
+    <div class="upload-box">
+      <span>2. Tài Xỉu (O/U)</span>
+      <input type="file" id="imgOu" accept="image/*" capture="environment">
+    </div>
+    <div class="upload-box">
+      <span>3. Phạt Góc (Corner)</span>
+      <input type="file" id="imgCorner" accept="image/*" capture="environment">
+    </div>
+    <div class="upload-box">
+      <span>4. Thẻ Phạt (Cards)</span>
+      <input type="file" id="imgCard" accept="image/*" capture="environment">
+    </div>
+  </div>
+
+  <button class="btn-submit" id="btnProcess" onclick="processImages()">⚡ BÓC TÁCH THÀNH TEXT</button>
+  <div id="status"></div>
+
+  <textarea id="resultBox" placeholder="Kết quả text hoàn chỉnh sẽ xuất hiện ở đây..." readonly></textarea>
+  <button class="btn-copy" id="btnCopy" onclick="copyResult()">📋 SAO CHÉP KẾT QUẢ</button>
+
+  <script>
+    // Tự lưu API Key vào LocalStorage
+    const keyInput = document.getElementById('apiKey');
+    keyInput.value = localStorage.getItem('gemini_api_key') || '';
+    keyInput.addEventListener('input', (e) => localStorage.setItem('gemini_api_key', e.target.value.trim()));
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function processImages() {
+      const apiKey = keyInput.value.trim();
+      if (!apiKey) return alert("Vui lòng nhập Gemini API Key!");
+
+      const files = [
+        { label: "KÈO CHẤP", file: document.getElementById('imgHdp').files[0] },
+        { label: "TÀI XỈU", file: document.getElementById('imgOu').files[0] },
+        { label: "PHẠT GÓC", file: document.getElementById('imgCorner').files[0] },
+        { label: "THẺ PHẠT", file: document.getElementById('imgCard').files[0] }
+      ];
+
+      const uploaded = files.filter(f => f.file);
+      if (uploaded.length === 0) return alert("Hãy chọn ít nhất 1 ảnh kèo!");
+
+      const status = document.getElementById('status');
+      const btn = document.getElementById('btnProcess');
+      btn.disabled = true;
+      status.innerText = "Đang nén ảnh và gửi lên Gemini xử lý...";
+
+      try {
+        const imageParts = [];
+        for (const item of uploaded) {
+          const b64 = await fileToBase64(item.file);
+          imageParts.push({
+            inline_data: { mime_type: item.file.type, data: b64 }
+          });
+        }
+
+        const promptText = `
+        Bạn là chuyên gia bóc tách dữ liệu tỷ lệ cá cược bóng đá. Tôi tải lên ${uploaded.length} ảnh tương ứng với các danh mục kèo (Kèo chấp handicap, Tài xỉu bàn thắng, Phạt góc, Thẻ phạt).
+        
+        Hãy đọc kỹ thông số các ảnh và xuất ra một báo cáo văn bản có cấu trúc chuẩn xác:
+        
+        Trận đấu: [Tên Đội Nhà] vs [Tên Đội Khách] (Giải: [Tên giải đấu nếu có], Giờ: [Giờ nếu có])
+        
+        1. KÈO CHÍNH CẢ TRẬN (FT):
+        - Kèo chấp: [Đội chấp] chấp [Tỷ lệ chấp] (Odds: Đội nhà [Ăn] / Đội khách [Ăn])
+        - Tài Xỉu bàn thắng: [Tỷ lệ O/U] (Tài [Ăn] / Xỉu [Ăn])
+        - Kèo 1X2 (Châu Âu nếu có): 1: [...] | X: [...] | 2: [...]
+        
+        2. KÈO HIỆP 1 (HT) (Nếu có trong ảnh):
+        - Kèo chấp HT: [Đội chấp] chấp [Tỷ lệ] (Odds: [Ăn] / [Ăn])
+        - Tài Xỉu HT: [Tỷ lệ] (Tài [Ăn] / Xỉu [Ăn])
+
+        3. KÈO PHẠT GÓC (Nếu có trong ảnh):
+        - Chấp góc FT: [Đội chấp góc] chấp [Tỷ lệ] (Odds: [Ăn] / [Ăn])
+        - Tài Xỉu góc FT: [Tỷ lệ góc] (Tài [Ăn] / Xỉu [Ăn])
+
+        4. KÈO THẺ PHẠT (Nếu có trong ảnh):
+        - Chấp thẻ FT: [Đội chấp thẻ] chấp [Tỷ lệ] (Odds: [Ăn] / [Ăn])
+        - Tài Xỉu thẻ FT: [Tỷ lệ thẻ] (Tài [Ăn] / Xỉu [Ăn])
+
+        QUY TẮC BẮT BUỘC:
+        - Đội chấp là đội đổi màu hoặc in đậm hoặc có tỷ lệ chấp hiển thị cạnh tên.
+        - Giữ nguyên dấu âm (-) nếu tiền cược là tỷ lệ tiền âm (bỏ ít ăn đủ).
+        - Nếu ảnh nào không có dữ liệu (ví dụ không chụp thẻ phạt), bỏ qua mục đó.
+        - Chỉ trả về text kết quả, không viết thêm lời mở đầu hay kết thúc.
+        `;
+
+        const requestBody = {
+          contents: [{
+            parts: [...imageParts, { text: promptText }]
+          }]
+        };
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+          const resText = data.candidates[0].content.parts[0].text.trim();
+          document.getElementById('resultBox').value = resText;
+          document.getElementById('btnCopy').style.display = 'block';
+          status.innerText = "Xử lý thành công!";
+          // Tự động copy luôn vào clipboard
+          navigator.clipboard.writeText(resText);
+        } else {
+          status.innerText = "Lỗi phản hồi từ Gemini: " + JSON.stringify(data);
+        }
+      } catch (err) {
+        status.innerText = "Lỗi kết nối: " + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function copyResult() {
+      const text = document.getElementById('resultBox').value;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Đã sao chép vào Clipboard! Bạn có thể dán vào Gemini để phân tích.");
+      });
+    }
+  </script>
+</body>
+</html>
